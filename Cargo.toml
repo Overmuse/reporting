@@ -1,6 +1,6 @@
 [package]
 name = "reporting"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Sebastian Rollen <seb@overmu.se>"]
 edition = "2018"
 
@@ -11,6 +11,7 @@ alpaca = { tag = "v0.7.0", git = "ssh://git@github.com/Overmuse/alpaca" }
 anyhow = "1.0.41"
 config = "0.11.0"
 dogstatsd = { git = "ssh://git@github.com/Overmuse/dogstatsd", tag = "v0.3.0" }
+dotenv = "0.15.0"
 futures = "0.3.15"
 kafka-settings = { git = "ssh://git@github.com/Overmuse/kafka-settings", tag = "v0.3.1" }
 rdkafka = { version = "0.26.0", features = ["ssl-vendored"] }
@@ -18,3 +19,5 @@ serde = "1.0.126"
 serde_json = "1.0.64"
 serde_plain = "0.3.0"
 tokio = { version = "1.7.0", features = ["rt-multi-thread", "macros"] }
+tracing = "0.1.26"
+tracing-subscriber = "0.2.18"
