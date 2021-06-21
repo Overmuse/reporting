@@ -1,5 +1,5 @@
 use alpaca::AlpacaMessage;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use dogstatsd::Client;
 use futures::StreamExt;
 use kafka_settings::consumer;
@@ -20,20 +20,29 @@ async fn main() -> Result<()> {
         .finish();
     set_global_default(subscriber).expect("Failed to set subscriber");
     info!("Starting reporting");
-    let settings = settings::Settings::new()?;
-    let consumer = consumer(&settings.kafka)?;
+    let settings = settings::Settings::new().context("Failed to load settings")?;
+    let consumer = consumer(&settings.kafka).context("Failed to create kafka consumer")?;
     debug!("Creating dogstatsd client");
-    let client = Client::new("0.0.0.0:0", &settings.app.target_address).await?;
+    let client = Client::new("127.0.0.1:0", &settings.app.target_address)
+        .await
+        .context("Failed to create dogstatsd client")?;
     while let Some(message) = consumer.stream().next().await {
-        let message = message?;
+        let message = message.context("Error from kafka")?;
         if let Some(payload) = message.payload() {
             trace!("Received payload");
-            let alpaca_message: AlpacaMessage = serde_json::from_slice(payload)?;
+            let alpaca_message: AlpacaMessage =
+                serde_json::from_slice(payload).context("Failed to deserialize alpaca message")?;
             if let AlpacaMessage::TradeUpdates(order_update) = alpaca_message {
                 debug!("Received trade update, generating metrics");
-                let metrics = order_update.order.to_metrics()?;
+                let metrics = order_update
+                    .order
+                    .to_metrics()
+                    .context("Failed to convert order to metrics")?;
                 for metric in metrics {
-                    client.send(metric).await?;
+                    client
+                        .send(metric)
+                        .await
+                        .context("Failed to send metrics")?;
                 }
             }
         }
