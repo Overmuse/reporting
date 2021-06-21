@@ -13,7 +13,6 @@ impl ToMetrics for Order {
                 "status",
                 serde_plain::to_string(&self.status).context("Failed to serialize order status")?,
             )
-            .add_key_value("id", &self.client_order_id)
             .add_key_value("ticker", &self.symbol)
             .add_key_value(
                 "side",
