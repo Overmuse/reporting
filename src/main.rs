@@ -23,9 +23,12 @@ async fn main() -> Result<()> {
     let settings = settings::Settings::new().context("Failed to load settings")?;
     let consumer = consumer(&settings.kafka).context("Failed to create kafka consumer")?;
     debug!("Creating dogstatsd client");
-    let client = Client::new("127.0.0.1:0", &settings.app.target_address)
-        .await
-        .context("Failed to create dogstatsd client")?;
+    let client = Client::new(
+        "127.0.0.1:0",
+        &format!("{}:8125", settings.app.target_address),
+    )
+    .await
+    .context("Failed to create dogstatsd client")?;
     while let Some(message) = consumer.stream().next().await {
         let message = message.context("Error from kafka")?;
         if let Some(payload) = message.payload() {
