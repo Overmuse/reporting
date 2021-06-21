@@ -1,6 +1,6 @@
 [package]
 name = "reporting"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Sebastian Rollen <seb@overmu.se>"]
 edition = "2018"
 
