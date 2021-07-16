@@ -3,13 +3,13 @@ use kafka_settings::KafkaSettings;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-pub struct AppSettings {
-    pub target_address: String,
+pub struct WebServerSettings {
+    pub port: u16,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    pub app: AppSettings,
+    pub webserver: WebServerSettings,
     pub kafka: KafkaSettings,
 }
 
