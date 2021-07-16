@@ -1,15 +1,50 @@
 use alpaca::AlpacaMessage;
 use anyhow::{Context, Result};
-use dogstatsd::Client;
 use futures::StreamExt;
 use kafka_settings::consumer;
+use lazy_static::lazy_static;
+use prometheus::Registry;
 use rdkafka::Message;
-mod settings;
-mod types;
+use serde::Deserialize;
 use tracing::subscriber::set_global_default;
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 use tracing_subscriber::EnvFilter;
-use types::ToMetrics;
+
+mod domain;
+mod server;
+mod settings;
+
+lazy_static! {
+    pub static ref REGISTRY: Registry = Registry::new();
+}
+
+pub fn register_custom_metrics() {
+    domain::orders::register();
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum Input {
+    Alpaca(AlpacaMessage),
+}
+
+pub async fn run_kafka(kafka_settings: &kafka_settings::KafkaSettings) -> Result<()> {
+    let consumer = consumer(kafka_settings).context("Failed to create kafka consumer")?;
+    while let Some(message) = consumer.stream().next().await {
+        let message = message.context("Error from kafka")?;
+        if let Some(payload) = message.payload() {
+            trace!("Received payload");
+            let input: Input =
+                serde_json::from_slice(payload).context("Failed to deserialize message")?;
+            match input {
+                Input::Alpaca(alpaca_message) => {
+                    domain::orders::handle_alpaca_message(alpaca_message)
+                }
+            }
+        }
+    }
+    Ok(())
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,35 +55,10 @@ async fn main() -> Result<()> {
         .finish();
     set_global_default(subscriber).expect("Failed to set subscriber");
     info!("Starting reporting");
+    register_custom_metrics();
     let settings = settings::Settings::new().context("Failed to load settings")?;
-    let consumer = consumer(&settings.kafka).context("Failed to create kafka consumer")?;
-    debug!("Creating dogstatsd client");
-    let client = Client::new(
-        "127.0.0.1:0",
-        &format!("{}:8125", settings.app.target_address),
-    )
-    .await
-    .context("Failed to create dogstatsd client")?;
-    while let Some(message) = consumer.stream().next().await {
-        let message = message.context("Error from kafka")?;
-        if let Some(payload) = message.payload() {
-            trace!("Received payload");
-            let alpaca_message: AlpacaMessage =
-                serde_json::from_slice(payload).context("Failed to deserialize alpaca message")?;
-            if let AlpacaMessage::TradeUpdates(order_update) = alpaca_message {
-                debug!("Received trade update, generating metrics");
-                let metrics = order_update
-                    .order
-                    .to_metrics()
-                    .context("Failed to convert order to metrics")?;
-                for metric in metrics {
-                    client
-                        .send(metric)
-                        .await
-                        .context("Failed to send metrics")?;
-                }
-            }
-        }
+    tokio::select! {
+        _ = run_kafka(&settings.kafka) => Ok(()),
+        _ = server::run(settings.webserver.port) => Ok(())
     }
-    Ok(())
 }
