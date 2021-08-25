@@ -38,7 +38,7 @@ pub fn handle_alpaca_message(message: AlpacaMessage) {
         if let Event::Fill { price, .. } = order_update.event {
             debug!("Received order fill update, generating metrics");
             let ticker = order_update.order.symbol;
-            let qty = order_update.order.qty.unwrap();
+            let qty = Decimal::from_usize(order_update.order.qty).unwrap();
             NUM_TRADES.with_label_values(&[&ticker]).inc();
             GROSS_TRADE_AMOUNT
                 .with_label_values(&[&ticker])
